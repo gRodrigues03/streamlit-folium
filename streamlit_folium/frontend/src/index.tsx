@@ -1,7 +1,6 @@
-import { RenderData, Streamlit } from "streamlit-component-lib"
-import { debounce } from "underscore"
-import { circleToPolygon } from "./circle-to-polygon"
-import { Layer } from "leaflet"
+import {RenderData, Streamlit} from "streamlit-component-lib"
+import {debounce} from "underscore"
+import {Layer} from "leaflet"
 
 /* Sometimes we get a new render event when we are still
    initializing the map. This happens during the load of
@@ -9,18 +8,15 @@ import { Layer } from "leaflet"
    This variable is used as a flag during loading to ignore
    that extra render event.
 */
-var ignore_render = false;
+let ignore_render = false;
 
 type GlobalData = {
-  lat_lng_clicked: any
   last_object_clicked: any
   last_object_clicked_tooltip: string | null
   last_object_clicked_popup: string | null
   last_active_drawing: any
   all_drawings: any
   zoom: any
-  last_circle_radius: number | null
-  last_circle_polygon: any
   returned_objects: Array<string>
   previous_data: any
   last_zoom: any
@@ -43,9 +39,7 @@ declare global {
   }
 }
 
-function onMapClick(e: any) {
-  const global_data = window.__GLOBAL_DATA__
-  global_data.lat_lng_clicked = e.latlng
+function onMapClick() {
   debouncedUpdateComponentValue(window.map)
 }
 
@@ -57,7 +51,6 @@ function updateComponentValue(map: any) {
   let bounds = map.getBounds()
   let zoom = map.getZoom()
   let _data = {
-    last_clicked: global_data.lat_lng_clicked,
     last_object_clicked: global_data.last_object_clicked,
     last_object_clicked_tooltip: global_data.last_object_clicked_tooltip,
     last_object_clicked_popup: global_data.last_object_clicked_popup,
@@ -65,8 +58,6 @@ function updateComponentValue(map: any) {
     last_active_drawing: global_data.last_active_drawing,
     bounds: bounds,
     zoom: zoom,
-    last_circle_radius: global_data.last_circle_radius,
-    last_circle_polygon: global_data.last_circle_polygon,
     center: map.getCenter(),
     selected_layers: Object.values(global_data.selected_layers)
   }
@@ -74,8 +65,8 @@ function updateComponentValue(map: any) {
   let to_return = global_data.returned_objects
 
   // Filter down the data to only that data passed in the returned_objects list
-  let data: any = {}
-  if (to_return) {
+  let data: any
+    if (to_return) {
     data = Object.fromEntries(
       Object.entries(_data).filter(([key]) =>
         global_data.returned_objects.includes(key)
@@ -90,96 +81,30 @@ function updateComponentValue(map: any) {
   }
 }
 
-function onMapMove(e: any) {
+function onMapMove() {
   debouncedUpdateComponentValue(window.map)
 }
 
 function extractContent(s: string) {
-  var span = document.createElement("span")
+  const span = document.createElement("span")
   span.innerHTML = s
   return (span.textContent || span.innerText).trim()
 }
 
-function onDraw(e: any) {
-  const global_data = window.__GLOBAL_DATA__
-
-  var type = e.layerType,
-    layer = e.layer
-
-  if (type === "circle") {
-    var center: [number, number] = [layer._latlng.lng, layer._latlng.lat]
-    var radius = layer.options.radius // In meters
-    var polygon = circleToPolygon(center, radius)
-
-    // Ensure that radius gets added to circle properties when converted to GeoJSON
-    var feature = (e.layer.feature = e.layer.feature || {})
-    feature.type = "Feature"
-    feature.properties = feature.properties || {}
-    feature.properties["radius"] = radius
-
-    global_data.last_circle_radius = radius / 1000 // Convert to km to match what UI shows
-    global_data.last_circle_polygon = polygon
-  }
-  return onLayerClick(e)
-}
-
-function removeLayer(e: any) {
-  const global_data = window.__GLOBAL_DATA__
-  let layer = e.layer
-
-  if (layer && layer["_url"] && layer["wmsParams"] && layer["wmsParams"]["layers"]) {
-    const layerName = layer["wmsParams"]["layers"];
-    const layerUrl = layer["_url"];
-
-    const layerKey = `${layerUrl},${layerName}`;
-
-    // Remove the layer object if it exists
-    if (global_data.selected_layers[layerKey]) {
-      delete global_data.selected_layers[layerKey];
-    }
-  }
-
-  debouncedUpdateComponentValue(window.map)
-}
-
-function addLayer(e: any) {
-  const global_data = window.__GLOBAL_DATA__
-  let layer = e.layer
-
-  if (layer && layer["_url"] && layer["wmsParams"] && layer["wmsParams"]["layers"]) {
-    const layerName = layer["wmsParams"]["layers"];
-    const layerUrl = layer["_url"];
-
-    const layerKey = `${layerUrl},${layerName}`;
-
-    if (!global_data.selected_layers[layerKey]) {
-      global_data.selected_layers[layerKey] = { name: layerName, url: layerUrl };
-    }
-  }
-
-  debouncedUpdateComponentValue(window.map)
-}
-
 function onLayerClick(e: any) {
+  console.log('onLayerClick fired')
   const global_data = window.__GLOBAL_DATA__
   global_data.last_object_clicked = e.latlng
-
   if (e.sourceTarget._tooltip && e.sourceTarget._tooltip._content) {
-    let tooltip_text = extractContent(e.sourceTarget.getTooltip().getContent())
-    global_data.last_object_clicked_tooltip = tooltip_text
+    global_data.last_object_clicked_tooltip = extractContent(e.sourceTarget.getTooltip().getContent())
   } else if (e.target._tooltip && e.target._tooltip._content) {
-    let tooltip_text = e.target.getTooltip().getContent()(
-      e.sourceTarget
-    ).innerText
-    global_data.last_object_clicked_tooltip = tooltip_text
+    global_data.last_object_clicked_tooltip = e.target.getTooltip().getContent()(e.sourceTarget).innerText
   }
 
   if (e.sourceTarget._popup && e.sourceTarget._popup._content) {
-    let popup_text = e.sourceTarget.getPopup().getContent().innerText
-    global_data.last_object_clicked_popup = popup_text
+    global_data.last_object_clicked_popup = e.sourceTarget.getPopup().getContent().innerText
   } else if (e.target._popup && e.target._popup._content) {
-    let popup_text = e.target.getPopup().getContent()(e.sourceTarget).innerText
-    global_data.last_object_clicked_popup = popup_text
+    global_data.last_object_clicked_popup = e.target.getPopup().getContent()(e.sourceTarget).innerText
   }
 
   let details: Array<any> = []
@@ -193,27 +118,25 @@ function onLayerClick(e: any) {
   debouncedUpdateComponentValue(window.map)
 }
 
-function getPixelatedStyles(pixelated: boolean) {
-  if (pixelated) {
-    const styles = `
-    .leaflet-image-layer {
-      /* old android/safari*/
-      image-rendering: -webkit-optimize-contrast;
-      image-rendering: crisp-edges; /* safari */
-      image-rendering: pixelated; /* chrome */
-      image-rendering: -moz-crisp-edges; /* firefox */
-      image-rendering: -o-crisp-edges; /* opera */
-      -ms-interpolation-mode: nearest-neighbor; /* ie */
+function onCreate(e: any) {
+    if (!e.layer.options.original) e.layer.options.original = {};
+    if (!e.layer.options.editing) e.layer.options.editing = {};
+
+    // Now it’s safe to set
+    if (typeof e.layer.options.original.className !== 'string') {
+        e.layer.options.original.className = '';
     }
-    `
-    return styles
-  }
-  const styles = `
-  .leaflet-image-layer {
-  }
-  `
-  return styles
+    if (typeof e.layer.options.editing.className !== 'string') {
+        e.layer.options.editing.className = '';
+    }
+    if (!window.drawnItems.hasLayer(e.layer)) {
+        window.drawnItems.addLayer(e.layer);
+    }
+    console.log('Drawn items')
+    window.drawnItems.eachLayer((l: { options: any; }) => console.log(l.options));
+    onLayerClick(e)
 }
+
 window.Streamlit = Streamlit;
 
 window.initComponent = (map: any, return_on_hover: boolean) => {
@@ -237,13 +160,9 @@ window.initComponent = (map: any, return_on_hover: boolean) => {
       layer.on("mouseover", onLayerClick)
     }
   }
-  map.on("draw:created", onDraw)
-  map.on("draw:edited", onDraw)
-  map.on("draw:deleted", onDraw)
-
-  // Adding functionality for tracking layer changes
-  map.on("overlayadd", addLayer);
-  map.on("overlayremove", removeLayer);
+  map.on("draw:created", onCreate)
+  map.on("draw:edited", onLayerClick)
+  map.on("draw:deleted", onLayerClick)
 
   Streamlit.setFrameHeight(global_data.height);
   updateComponentValue(map)
@@ -273,7 +192,6 @@ async function onRender(event: Event) {
   const feature_group: string = data.args["feature_group"]
   const return_on_hover: boolean = data.args["return_on_hover"]
   const layer_control: string = data.args["layer_control"]
-  const pixelated: boolean = data.args["pixelated"]
 
   // load scripts
   const loadScripts = async () => {
@@ -296,9 +214,6 @@ async function onRender(event: Event) {
       linkTag.href = link
       window.document.head.appendChild(linkTag)
     })
-    const style = document.createElement("style")
-    style.innerHTML = getPixelatedStyles(pixelated)
-    window.document.head.appendChild(style)
 
     window.document.head.innerHTML += header;
   }
@@ -350,15 +265,15 @@ async function onRender(event: Event) {
       Streamlit.setFrameHeight(height)
     }
 
-    var view_changed = false
-    var new_zoom = window.map.getZoom()
+    let view_changed = false
+    let new_zoom = window.map.getZoom()
     if (zoom && zoom !== window.__GLOBAL_DATA__.last_zoom) {
       new_zoom = zoom
       window.__GLOBAL_DATA__.last_zoom = zoom
       view_changed = true
     }
 
-    var new_center = window.map.getCenter()
+    let new_center = window.map.getCenter()
     if (
       center &&
       JSON.stringify(center) !==
@@ -374,10 +289,9 @@ async function onRender(event: Event) {
     }
   }
 
-  if (!window.map && ignore_render === false) {
+  if (!window.map && !ignore_render) {
     // Only run this if the map hasn't already been created (and thus the global
     //data hasn't been initialized)
-    const parent_div = document.getElementById("parent")
     const div1 = document.getElementById("map_div")
     const div2 = document.getElementById("map_div2")
     if (div2) {
@@ -393,15 +307,12 @@ async function onRender(event: Event) {
       // in the script.
 
       window.__GLOBAL_DATA__ = {
-        lat_lng_clicked: null,
         last_object_clicked: null,
         last_object_clicked_tooltip: null,
         last_object_clicked_popup: null,
         all_drawings: null,
         last_active_drawing: null,
         zoom: null,
-        last_circle_radius: null,
-        last_circle_polygon: null,
         returned_objects: returned_objects,
         previous_data: _default,
         last_zoom: null,
@@ -411,13 +322,89 @@ async function onRender(event: Event) {
         selected_layers: {},
         height: height
       }
-      if (script.indexOf("map_div2") !== -1) {
-        parent_div?.classList.remove("single")
-        parent_div?.classList.add("double")
-      }
     }
     await loadScripts().then(() => {
       ignore_render = false;
+
+        if (window.L && window.L.drawLocal) {
+            Object.assign((window as any).L.drawLocal, {
+                draw: {
+                    toolbar: {
+                        actions: {
+                            title: 'Cancelar desenho',
+                            text: 'Cancelar'
+                        },
+                        finish: {
+                            title: 'Concluir desenho',
+                            text: 'Concluir'
+                        },
+                        undo: {
+                            title: 'Remover o último ponto desenhado',
+                            text: 'Desfazer último ponto'
+                        },
+                        buttons: {
+                            polyline: 'Desenhar linha',
+                            polygon: 'Desenhar polígono',
+                            rectangle: 'Desenhar retângulo',
+                            marker: 'Adicionar marcador',
+                        }
+                    },
+                    handlers: {
+                        marker: {
+                            tooltip: { start: 'Clique no mapa para adicionar um marcador' }
+                        },
+                        polygon: {
+                            tooltip: {
+                                start: 'Clique para começar a desenhar a forma',
+                                cont: 'Clique para continuar desenhando',
+                                end: 'Clique no ponto inicial para fechar a forma'
+                            }
+                        },
+                        polyline: {
+                            error: '<strong>Erro:</strong> as linhas não podem se cruzar!',
+                            tooltip: {
+                                start: 'Clique para começar a desenhar a linha',
+                                cont: 'Clique para continuar desenhando a linha',
+                                end: 'Clique no último ponto para finalizar a linha'
+                            }
+                        },
+                        rectangle: {
+                            tooltip: { start: 'Clique e arraste para desenhar um retângulo' }
+                        },
+                        simpleshape: {
+                            tooltip: { end: 'Solte o mouse para finalizar o desenho' }
+                        }
+                    }
+                },
+                edit: {
+                    toolbar: {
+                        actions: {
+                            save: { title: 'Salvar alterações', text: 'Salvar' },
+                            cancel: { title: 'Cancelar edição, descartar alterações', text: 'Cancelar' },
+                            clearAll: { title: 'Remover todas as camadas', text: 'Remover tudo' }
+                        },
+                        buttons: {
+                            edit: 'Editar camadas',
+                            editDisabled: 'Nenhuma camada para editar',
+                            remove: 'Remover camadas',
+                            removeDisabled: 'Nenhuma camada para remover'
+                        }
+                    },
+                    handlers: {
+                        edit: {
+                            tooltip: {
+                                text: 'Arraste os pontos ou marcadores para editar a forma.',
+                                subtext: 'Clique em Cancelar para descartar as alterações'
+                            }
+                        },
+                        remove: {
+                            tooltip: { text: 'Clique em uma forma para removê-la' }
+                        }
+                    }
+                }
+            })
+        }
+
       const render_script = document.createElement("script")
       if (!window.map) {
 	/* first add the html elements as the scripts may
@@ -431,10 +418,6 @@ async function onRender(event: Event) {
           script +
           `window.map = map_div; window.initComponent(map_div, ${return_on_hover});`
         document.body.appendChild(render_script)
-        const styles = getPixelatedStyles(pixelated)
-        var styleSheet = document.createElement("style")
-        styleSheet.innerText = styles
-        document.head.appendChild(styleSheet)
       }
       finalizeOnRender()
     })
