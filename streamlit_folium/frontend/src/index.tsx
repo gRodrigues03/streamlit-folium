@@ -346,10 +346,19 @@ async function onRender(event: Event) {
                             polyline: 'Desenhar linha',
                             polygon: 'Desenhar polígono',
                             rectangle: 'Desenhar retângulo',
+                            circle: 'Desenhar círculo',
                             marker: 'Adicionar marcador',
+                            circlemarker: 'Adicionar marcador circular'
                         }
                     },
                     handlers: {
+                        circle: {
+                            tooltip: { start: 'Clique e arraste para desenhar um círculo' },
+                            radius: 'Raio'
+                        },
+                        circlemarker: {
+                            tooltip: { start: 'Clique no mapa para adicionar um marcador circular' }
+                        },
                         marker: {
                             tooltip: { start: 'Clique no mapa para adicionar um marcador' }
                         },
