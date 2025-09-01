@@ -1,6 +1,5 @@
 import {RenderData, Streamlit} from "streamlit-component-lib"
 import {debounce} from "underscore"
-import {Layer} from "leaflet"
 
 /* Sometimes we get a new render event when we are still
    initializing the map. This happens during the load of
@@ -17,12 +16,9 @@ type GlobalData = {
   last_active_drawing: any
   all_drawings: any
   zoom: any
-  returned_objects: Array<string>
   previous_data: any
   last_zoom: any
   last_center: any
-  last_feature_group: any
-  last_layer_control: any
   height: any
   selected_layers: Record<string, { name: string; url: string }>
 }
@@ -33,8 +29,6 @@ declare global {
     initComponent: any
     map: any
     drawnItems: any
-    feature_group: any
-    layer_control: any
     Streamlit: any
   }
 }
@@ -62,22 +56,9 @@ function updateComponentValue(map: any) {
     selected_layers: Object.values(global_data.selected_layers)
   }
 
-  let to_return = global_data.returned_objects
-
-  // Filter down the data to only that data passed in the returned_objects list
-  let data: any
-    if (to_return) {
-    data = Object.fromEntries(
-      Object.entries(_data).filter(([key]) =>
-        global_data.returned_objects.includes(key)
-      )
-    )
-  } else {
-    data = _data
-  }
-  if (JSON.stringify(previous_data) !== JSON.stringify(data)) {
-    global_data.previous_data = data
-    Streamlit.setComponentValue(data)
+  if (JSON.stringify(previous_data) !== JSON.stringify(_data)) {
+    global_data.previous_data = _data
+    Streamlit.setComponentValue(_data)
   }
 }
 
@@ -185,13 +166,10 @@ async function onRender(event: Event) {
 
   const js_links: Array<string> = data.args["js_links"]
   const css_links: Array<string> = data.args["css_links"]
-  const returned_objects: Array<string> = data.args["returned_objects"]
   const _default: any = data.args["default"]
   const zoom: any = data.args["zoom"]
   const center: any = data.args["center"]
-  const feature_group: string = data.args["feature_group"]
   const return_on_hover: boolean = data.args["return_on_hover"]
-  const layer_control: string = data.args["layer_control"]
 
   // load scripts
   const loadScripts = async () => {
@@ -225,45 +203,6 @@ async function onRender(event: Event) {
        we are initialized.
     */
     if (!window.map) return
-    if (
-      feature_group !== window.__GLOBAL_DATA__.last_feature_group ||
-      layer_control !== window.__GLOBAL_DATA__.last_layer_control ||
-      height !== window.__GLOBAL_DATA__.height
-    ) {
-      // remove previous feature group and layer control
-      if (window.feature_group && window.feature_group.length > 0) {
-        window.feature_group.forEach((layer: Layer) => {
-          window.map.removeLayer(layer)
-        })
-      }
-
-      if (window.layer_control) {
-        window.map.removeControl(window.layer_control)
-      }
-
-      // update feature group and layer control cache
-      window.__GLOBAL_DATA__.last_feature_group = feature_group
-      window.__GLOBAL_DATA__.last_layer_control = layer_control
-      window.__GLOBAL_DATA__.height = height
-
-      if (feature_group) {
-        // eslint-disable-next-line
-        eval(feature_group + layer_control)
-        for (let key in window.map._layers) {
-          let layer = window.map._layers[key]
-          layer.off("click", onLayerClick)
-          layer.on("click", onLayerClick)
-          if (return_on_hover) {
-            layer.off("mouseover", onLayerClick)
-            layer.on("mouseover", onLayerClick)
-          }
-        }
-      } else {
-        // eslint-disable-next-line
-        eval(layer_control)
-      }
-      Streamlit.setFrameHeight(height)
-    }
 
     let view_changed = false
     let new_zoom = window.map.getZoom()
@@ -313,12 +252,9 @@ async function onRender(event: Event) {
         all_drawings: null,
         last_active_drawing: null,
         zoom: null,
-        returned_objects: returned_objects,
         previous_data: _default,
         last_zoom: null,
         last_center: null,
-        last_feature_group: null,
-        last_layer_control: null,
         selected_layers: {},
         height: height
       }
